@@ -1,0 +1,23 @@
+toRun:
+  - open terminal
+  - execute: g++ main.cpp -std=c++11 -o spark
+  - now create the "fileName.spark"
+  - then open terminal and execute: ./spark fileName.spark
+
+logicOfHowRunningNewFileExtension:
+  - The .spark file is not executed directly by the operating system
+  - The .spark file is treated as a normal text file
+  - The spark program (written in C++, in this case main.cpp) acts as an interpreter
+  - When we run ./spark fileName.spark, the operating system runs the compiled C++ program, spark
+  - The spark program opens the .spark file using file handling (ifstream)
+  - The program reads the file line by line using getline()
+  - Each line is stored in a string variable
+  - The interpreter then analyzes each line (this part will later include lexer, parser, and execution logic)
+  - Based on the syntax (like print, let, if, etc.), the interpreter will execute the corresponding action
+  - The result is then printed to the terminal
+
+specialMainFunction:
+  - as we will use the terminal to run fileName.spark file we need a special type of main function (int main(int argCount, char *argVector[]) )
+  - this special version of main() that allows the program to receive command-line arguments
+  - argCount: argument count , it's return the number of argument written on the terminal
+  - argVector[]: argument vector, returns the argument based on index

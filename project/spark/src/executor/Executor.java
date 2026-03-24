@@ -2,6 +2,7 @@ package executor;
 
 import lexicalAnalysis.Lexer;
 import lexicalAnalysis.Token;
+import parser.Parser;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -50,6 +51,7 @@ public class Executor {
                 List<Token> tokens = Lexer.lexer(line, lineNumber);
                 allTokens.addAll(tokens);
 
+
                 if (Lexer.debuggingMode) {
                     System.out.print(lineNumber + ": ");
                     for (Token t : tokens)
@@ -59,8 +61,13 @@ public class Executor {
             }
 
             if (blockComment) System.err.println("Error: Unclosed block comment starting at line " + blockStartLine);
+
+
         } catch (Exception e) {
             System.out.println("Can't open file: " + fileName);
         }
+
+        Parser parser = new Parser(allTokens);
+        parser.parse();
     }
 }

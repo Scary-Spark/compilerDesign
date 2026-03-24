@@ -1,1 +1,3 @@
-
+input a;
+const b = 10;
+printn a + b;

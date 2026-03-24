@@ -1,3 +1,11 @@
-input a;
-const b = 10;
-printn a + b;
+function a(x,y) {
+ print "something";
+ read m;
+ return x+y;
+}
+
+function add( x, y){
+    return a(x,y);
+}
+
+input k=add(2,3);

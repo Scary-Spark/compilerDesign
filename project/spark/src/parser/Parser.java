@@ -164,11 +164,9 @@ public class Parser {
 
     private void parsePrint(boolean newLine) {
         consume();
-        while (!matchSymbol(";")) {
-            parseExpression();
-        }
+        parseExpression();
+        expectSemicolon("print");
 
-        consume();
         if (debuggingMode) {
             System.out.println("Parsed Print" + (newLine ? "n" : ""));
         }
@@ -313,9 +311,28 @@ public class Parser {
 
         if (t.type == TokenType.NUMBER ||
                 t.type == TokenType.STRING ||
-                t.type == TokenType.IDENTIFIER ||
                 (t.type == TokenType.KEYWORD && (t.value.equals("true") || t.value.equals("false")))) {
             consume();
+            return;
+        }
+
+        if (t.type == TokenType.IDENTIFIER) {
+            consume(); // consume function name or variable
+
+            if (matchSymbol("(")) {
+                consume(); // (
+
+                if (!matchSymbol(")")) {
+                    parseExpression();
+                    while (matchSymbol(",")) {
+                        consume();
+                        parseExpression();
+                    }
+                }
+
+                expectSymbol(")", "function call");
+            }
+
             return;
         }
 

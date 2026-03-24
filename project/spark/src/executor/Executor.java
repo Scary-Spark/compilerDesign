@@ -9,6 +9,8 @@ import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
 
+import static lexicalAnalysis.Lexer.debuggingMode;
+
 public class Executor {
     static List<Token> allTokens = new ArrayList<>();
 
@@ -65,6 +67,10 @@ public class Executor {
 
         } catch (Exception e) {
             System.out.println("Can't open file: " + fileName);
+        }
+
+        if (debuggingMode) {
+            System.out.println("\n\n=======Parser=======");
         }
 
         Parser parser = new Parser(allTokens);

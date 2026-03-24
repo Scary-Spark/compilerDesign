@@ -21,3 +21,40 @@ specialMainFunction:
   - this special version of main() that allows the program to receive command-line arguments
   - argCount: argument count , it's return the number of argument written on the terminal
   - argVector[]: argument vector, returns the argument based on index
+
+
+for (size_t i = 0; i < line.size(); i++)
+    {
+        char c = line[i];
+
+        if (isspace(c))
+        {
+            if (!word.empty())
+            {
+                if (regex_match(word, keywordPattern))
+                {
+                    tokens.push_back(
+                        Token(
+                            TokenType::KEYWORD,
+                            word));
+                }
+                else if (regex_match(word, numberPattern))
+                {
+                    tokens.push_back(
+                        Token(
+                            TokenType::KEYWORD,
+                            word));
+                }
+                else if (regex_match(word, identifierPattern))
+                {
+                    tokens.push_back(
+                        Token(
+                            TokenType::IDENTIFIER,
+                            word));
+                }
+                word = "";
+            }
+            continue;
+        }
+
+    }

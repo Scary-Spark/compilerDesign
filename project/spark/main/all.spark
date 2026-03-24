@@ -4,7 +4,6 @@ const b = 15;
 input name="Spark";
 input isStuent = true;
 input double = 3.252623;
-blablabla;
 
 // comment
 /*

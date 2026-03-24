@@ -211,6 +211,41 @@ vector<Token> lexer(const string &line)
     return tokens;
 }
 
+string removeComments(const string &line, bool &inBlockComment)
+{
+    string result = "";
+    for (size_t i = 0; i < line.size(); i++)
+    {
+        // If already inside /* */
+        if (inBlockComment)
+        {
+            if (i + 1 < line.size() && line[i] == '*' && line[i + 1] == '/')
+            {
+                inBlockComment = false;
+                i++; // skip /
+            }
+            continue;
+        }
+
+        // Start of block comment
+        if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '*')
+        {
+            inBlockComment = true;
+            i++;
+            continue;
+        }
+
+        // Single line comment
+        if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '/')
+        {
+            break; // ignore rest of line
+        }
+
+        result += line[i];
+    }
+    return result;
+}
+
 void execute(const string &fileName)
 {
     ifstream file(fileName);
@@ -223,12 +258,21 @@ void execute(const string &fileName)
 
     string line;
     int lineNumber = 0;
+    bool inBlockComment = false;
 
     while (getline(file, line))
     {
         lineNumber++;
-        // For now, just show the line
-        vector<Token> tokens = lexer(line);
+
+        // Remove comments first
+        string cleanLine = removeComments(line, inBlockComment);
+
+        // Skip empty lines
+        if (cleanLine.empty())
+            continue;
+
+        vector<Token> tokens = lexer(cleanLine);
+
         cout << lineNumber << ": ";
         for (auto &t : tokens)
             t.print();

@@ -1,2 +1,12 @@
-input a;
-input 
+input x = 15;
+
+/*
+ block comment;
+ input z = 2.3;
+*/
+
+ input y=15;
+
+
+ /*
+ comment

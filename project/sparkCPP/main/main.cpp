@@ -75,9 +75,6 @@ public:
     Token(TokenType tokenType, const string &v, int l) : type(tokenType), value(v), line(l) {} // called initializer list
     // also can be declared using normal constructor way
 
-    // --------------
-    //      Logs
-    // --------------
     void print()
     {
         string typeName;
@@ -240,7 +237,6 @@ vector<Token> lexer(const string &line, int lineNumber)
 void execute(const string &fileName)
 {
     ifstream file(fileName);
-
     if (!file)
     {
         cout << "Cannot open file: " << fileName << endl;
@@ -252,6 +248,7 @@ void execute(const string &fileName)
     bool blockComment = false;
     int blockStartLine = 0;
 
+    vector<Token> allTokens;
     while (getline(file, line))
     {
         lineNumber++;
@@ -288,9 +285,7 @@ void execute(const string &fileName)
 
         int singleComment = line.find("//");
         if (singleComment != string::npos)
-        {
             line = line.substr(0, singleComment);
-        }
 
         if (line.empty())
             continue;
@@ -298,6 +293,8 @@ void execute(const string &fileName)
         vector<Token> tokens = lexer(line, lineNumber);
         if (tokens.empty())
             continue;
+
+        allTokens.insert(allTokens.end(), tokens.begin(), tokens.end());
 
         if (debuggingMode)
         {

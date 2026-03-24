@@ -7,6 +7,7 @@
 
 using namespace std;
 
+bool debuggingMode = true;
 const vector<string> reservedKeywords = {
     "input",
     "read",
@@ -21,8 +22,11 @@ const vector<string> reservedKeywords = {
     "break",
     "continue",
     "function",
+    "return",
     "for",
-    "while"};
+    "while",
+    "true",
+    "false"};
 
 const vector<char> reservedSymbols = {
     ';',
@@ -35,20 +39,20 @@ const vector<char> reservedSymbols = {
     ']'};
 
 const vector<string> reservedOperators = {
+    "==",
+    "!=",
+    ">=",
+    "<=",
+    "++",
+    "--",
     "+",
     "-",
     "*",
     "/",
     "%",
     "=",
-    "==",
-    "!=",
     ">",
-    "<",
-    ">=",
-    "<=",
-    "++",
-    "--"};
+    "<"};
 
 enum class TokenType
 {
@@ -66,13 +70,11 @@ class Token
 public:
     TokenType type;
     string value;
+    int line;
 
-    Token(TokenType tokenType, const string &v) : type(tokenType), value(v) {} // called initializer list
+    Token(TokenType tokenType, const string &v, int l) : type(tokenType), value(v), line(l) {} // called initializer list
     // also can be declared using normal constructor way
 
-    // --------------
-    //      Logs
-    // --------------
     void print()
     {
         string typeName;
@@ -99,7 +101,9 @@ public:
         default:
             typeName = "UNKNOWN";
         }
-        cout << "[" << typeName << ": " << value << "] ";
+
+        // cout << "<" << typeName << ", " << value << "> ";
+        cout << "<" << typeName << ", " << value << ", " << line << "> ";
     }
 };
 
@@ -135,16 +139,26 @@ string symbolPatternCreator()
     return finalPattern;
 }
 
-vector<Token> lexer(const string &line)
+bool isOperatorStart(const string &line, int i)
+{
+    for (auto &op : reservedOperators)
+    {
+        if (line.substr(i, op.size()) == op)
+            return true;
+    }
+    return false;
+}
+
+vector<Token> lexer(const string &line, int lineNumber)
 {
     regex keywordPattern(keywordPatternCreator());
-    regex numberPattern("[0-9]+(\\.[0-9]+)?");
+    regex numberPattern("-?[0-9]+(\\.[0-9]+)?([eE][-+]?[0-9]+)?");
     regex identifierPattern("[a-zA-Z_][a-zA-Z0-9_]*");
     regex symbolPattern(symbolPatternCreator());
 
     vector<Token> tokens;
 
-    size_t i = 0;
+    int i = 0;
     while (i < line.size())
     {
         char c = line[i];
@@ -157,15 +171,15 @@ vector<Token> lexer(const string &line)
 
         if (c == '"')
         {
-            size_t start = i + 1;
-            size_t end = line.find('"', start);
+            int start = i + 1;
+            int end = line.find('"', start);
             if (end == string::npos)
             {
-                cout << "Error: unmatched quotes\n";
+                cerr << "Error: Unmatched quotes starting at line " << lineNumber << endl;
                 break;
             }
             string content = line.substr(start, end - start);
-            tokens.push_back(Token(TokenType::STRING, content));
+            tokens.push_back(Token(TokenType::STRING, content, lineNumber));
             i = end + 1;
             continue;
         }
@@ -173,7 +187,7 @@ vector<Token> lexer(const string &line)
         string s(1, c);
         if (regex_match(s, symbolPattern))
         {
-            tokens.push_back(Token(TokenType::SYMBOL, s));
+            tokens.push_back(Token(TokenType::SYMBOL, s, lineNumber));
             i++;
             continue;
         }
@@ -183,7 +197,7 @@ vector<Token> lexer(const string &line)
         {
             if (line.substr(i, op.size()) == op)
             {
-                tokens.push_back(Token(TokenType::OPERATOR, op));
+                tokens.push_back(Token(TokenType::OPERATOR, op, lineNumber));
                 i += op.size();
                 matchedOperator = true;
                 break;
@@ -192,64 +206,37 @@ vector<Token> lexer(const string &line)
         if (matchedOperator)
             continue;
 
-        size_t start = i;
-        while (i < line.size() && !isspace(line[i]) &&
-               !regex_match(string(1, line[i]), symbolPattern))
+        int start = i;
+        while (
+            i < line.size() &&
+            !isspace(line[i]) &&
+            !regex_match(string(1, line[i]), symbolPattern) &&
+            !isOperatorStart(line, i))
+        {
             i++;
+        }
         string word = line.substr(start, i - start);
 
         if (regex_match(word, keywordPattern))
-            tokens.push_back(Token(TokenType::KEYWORD, word));
+            tokens.push_back(Token(TokenType::KEYWORD, word, lineNumber));
         else if (regex_match(word, numberPattern))
-            tokens.push_back(Token(TokenType::NUMBER, word));
+            tokens.push_back(Token(TokenType::NUMBER, word, lineNumber));
         else if (regex_match(word, identifierPattern))
-            tokens.push_back(Token(TokenType::IDENTIFIER, word));
+            tokens.push_back(Token(TokenType::IDENTIFIER, word, lineNumber));
         else
-            tokens.push_back(Token(TokenType::UNKNOWN, word));
+        {
+            tokens.push_back(Token(TokenType::UNKNOWN, word, lineNumber));
+
+            cerr << "Error: Unknown token '" << word << "' at line " << lineNumber << endl;
+        }
     }
 
     return tokens;
 }
 
-string removeComments(const string &line, bool &inBlockComment)
-{
-    string result = "";
-    for (size_t i = 0; i < line.size(); i++)
-    {
-        // If already inside /* */
-        if (inBlockComment)
-        {
-            if (i + 1 < line.size() && line[i] == '*' && line[i + 1] == '/')
-            {
-                inBlockComment = false;
-                i++; // skip /
-            }
-            continue;
-        }
-
-        // Start of block comment
-        if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '*')
-        {
-            inBlockComment = true;
-            i++;
-            continue;
-        }
-
-        // Single line comment
-        if (i + 1 < line.size() && line[i] == '/' && line[i + 1] == '/')
-        {
-            break; // ignore rest of line
-        }
-
-        result += line[i];
-    }
-    return result;
-}
-
 void execute(const string &fileName)
 {
     ifstream file(fileName);
-
     if (!file)
     {
         cout << "Cannot open file: " << fileName << endl;
@@ -258,25 +245,69 @@ void execute(const string &fileName)
 
     string line;
     int lineNumber = 0;
-    bool inBlockComment = false;
+    bool blockComment = false;
+    int blockStartLine = 0;
 
+    vector<Token> allTokens;
     while (getline(file, line))
     {
         lineNumber++;
 
-        // Remove comments first
-        string cleanLine = removeComments(line, inBlockComment);
+        if (blockComment)
+        {
+            if (line.find("*/") != string::npos)
+            {
+                blockComment = false;
+                line = line.substr(line.find("*/") + 2);
+            }
+            else
+                continue;
+        }
 
-        // Skip empty lines
-        if (cleanLine.empty())
+        int startBlock = line.find("/*");
+        if (startBlock != string::npos)
+        {
+            int endBlock = line.find("*/", startBlock + 2);
+
+            if (endBlock != string::npos)
+            {
+                line.erase(startBlock, endBlock - startBlock + 2);
+                startBlock = line.find("/*");
+            }
+            else
+            {
+                blockComment = true;
+                blockStartLine = lineNumber;
+                line = line.substr(0, startBlock);
+                startBlock = string::npos;
+            }
+        }
+
+        int singleComment = line.find("//");
+        if (singleComment != string::npos)
+            line = line.substr(0, singleComment);
+
+        if (line.empty())
             continue;
 
-        vector<Token> tokens = lexer(cleanLine);
+        vector<Token> tokens = lexer(line, lineNumber);
+        if (tokens.empty())
+            continue;
 
-        cout << lineNumber << ": ";
-        for (auto &t : tokens)
-            t.print();
-        cout << endl;
+        allTokens.insert(allTokens.end(), tokens.begin(), tokens.end());
+
+        if (debuggingMode)
+        {
+            cout << lineNumber << ": ";
+            for (auto &t : tokens)
+                t.print();
+            cout << endl;
+        }
+    }
+
+    if (blockComment)
+    {
+        cerr << "Error: Unclosed block comment starting at line " << blockStartLine << endl;
     }
 }
 

@@ -18,14 +18,12 @@ public class Lexer {
     }
 
     private char peek() {
-        if (pos >= input.length())
-            return '\0';
+        if (pos >= input.length()) return '\0';
         return input.charAt(pos);
     }
 
     private char peekNext() {
-        if (pos + 1 >= input.length())
-            return '\0';
+        if (pos + 1 >= input.length()) return '\0';
         return input.charAt(pos + 1);
     }
 
@@ -36,43 +34,98 @@ public class Lexer {
         return c;
     }
 
-    // FIX 1: Better whitespace skipping (handles Windows \r\n)
     private void skipWhitespace() {
-        while (true) {
-            char c = peek();
-            if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+        while (Character.isWhitespace(peek())) advance();
+    }
+
+    private void skipComment() {
+        if (peek() == '/' && peekNext() == '/') {
+            while (peek() != '\n' && peek() != '\0') advance();
+        } else if (peek() == '/' && peekNext() == '*') {
+            int startLine = line;
+            advance();
+            advance();
+            while (true) {
+                if (peek() == '\0') {
+                    System.err.println("Error: Unclosed multi-line comment starting at line " + startLine);
+                    return;
+                }
+                if (peek() == '*' && peekNext() == '/') {
+                    advance();
+                    advance();
+                    break;
+                }
                 advance();
-            } else {
-                break;
             }
         }
     }
 
-    // FIX 2: Safer comment skipping
-    private void skipComment() {
-        // Single line comment
-        if (peek() == '/' && peekNext() == '/') {
-            while (peek() != '\n' && peek() != '\0') {
-                advance();
+    private Token tokenizeIdentifierOrKeyword() {
+        StringBuilder sb = new StringBuilder();
+        int startLine = line;
+
+        while (Character.isLetterOrDigit(peek()) || peek() == '_') {
+            sb.append(advance());
+        }
+
+        String word = sb.toString();
+        if (keywords.contains(word)) {
+            return new Token(TokenType.KEYWORD, word, startLine);
+        } else {
+            return new Token(TokenType.IDENTIFIER, word, startLine);
+        }
+    }
+
+    private Token tokenizeNumber() {
+        StringBuilder sb = new StringBuilder();
+        int startLine = line;
+        boolean hasDot = false;
+
+        if (peek() == '.') { // handle leading dot numbers like .5
+            hasDot = true;
+            sb.append(advance());
+            if (!Character.isDigit(peek())) {
+                System.err.println("Error: Invalid number format at line " + startLine);
+                return null;
             }
         }
-        // Multi-line comment
-        else if (peek() == '/' && peekNext() == '*') {
-            advance(); // /
-            advance(); // *
 
-            while (true) {
-                if (peek() == '\0') break;
-
-                if (peek() == '*' && peekNext() == '/') {
-                    advance(); // *
-                    advance(); // /
+        while (Character.isDigit(peek()) || peek() == '.') {
+            if (peek() == '.') {
+                if (hasDot) {
+                    System.err.println("Error: Invalid number format at line " + startLine);
                     break;
                 }
-
-                advance();
+                hasDot = true;
             }
+            sb.append(advance());
         }
+
+        // Check for trailing invalid identifier chars like 12a
+        if (Character.isLetter(peek())) {
+            System.err.println("Error: Invalid character in number at line " + startLine);
+            while (Character.isLetterOrDigit(peek())) advance();
+        }
+
+        return new Token(TokenType.NUMBER, sb.toString(), startLine);
+    }
+
+    private Token tokenizeString() {
+        StringBuilder sb = new StringBuilder();
+        int startLine = line;
+        advance(); // skip opening "
+
+        while (peek() != '"' && peek() != '\0') {
+            if (peek() == '\n') {
+                System.err.println("Error: Unclosed string starting at line " + startLine);
+                break;
+            }
+            sb.append(advance());
+        }
+
+        if (peek() == '"') advance(); // skip closing "
+
+        return new Token(TokenType.STRING, sb.toString(), startLine);
     }
 
     public List<Token> tokenize() {
@@ -81,7 +134,6 @@ public class Lexer {
         while (pos < input.length()) {
             skipWhitespace();
 
-            // Skip comments
             if (peek() == '/' && (peekNext() == '/' || peekNext() == '*')) {
                 skipComment();
                 continue;
@@ -89,65 +141,36 @@ public class Lexer {
 
             char c = peek();
 
-            // Identifier or Keyword
-            if (Character.isLetter(c)) {
-                StringBuilder sb = new StringBuilder();
-                while (Character.isLetterOrDigit(peek())) {
-                    sb.append(advance());
-                }
-
-                String word = sb.toString();
-
-                if (keywords.contains(word)) {
-                    tokens.add(new Token(TokenType.KEYWORD, word, line));
-                } else {
-                    tokens.add(new Token(TokenType.IDENTIFIER, word, line));
-                }
-
+            if (Character.isLetter(c) || c == '_') {
+                tokens.add(tokenizeIdentifierOrKeyword());
                 continue;
             }
 
-            // Number (int or float)
-            if (Character.isDigit(c)) {
-                StringBuilder sb = new StringBuilder();
-                while (Character.isDigit(peek()) || peek() == '.') {
-                    sb.append(advance());
-                }
-                tokens.add(new Token(TokenType.NUMBER, sb.toString(), line));
+            if (Character.isDigit(c) || c == '.') {
+                Token numberToken = tokenizeNumber();
+                if (numberToken != null) tokens.add(numberToken);
                 continue;
             }
 
-            // String
             if (c == '"') {
-                advance();
-                StringBuilder sb = new StringBuilder();
-
-                while (peek() != '"' && peek() != '\0') {
-                    sb.append(advance());
-                }
-
-                advance(); // closing "
-                tokens.add(new Token(TokenType.STRING, sb.toString(), line));
+                tokens.add(tokenizeString());
                 continue;
             }
 
-            // Operators
             if ("+-*/=".indexOf(c) != -1) {
                 tokens.add(new Token(TokenType.OPERATOR, String.valueOf(c), line));
                 advance();
                 continue;
             }
 
-            // Delimiters
             if (";,(){}".indexOf(c) != -1) {
                 tokens.add(new Token(TokenType.DELIMITER, String.valueOf(c), line));
                 advance();
                 continue;
             }
 
-            // FIX 3: Avoid false unexpected character errors
-            if (c != '\0' && !Character.isWhitespace(c)) {
-                System.out.println("Unexpected character: '" + c + "' at line " + line);
+            if (c != '\0') {
+                System.err.println("Unexpected character: '" + c + "' at line " + line);
             }
             advance();
         }

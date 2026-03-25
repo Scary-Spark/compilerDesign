@@ -1,15 +1,15 @@
 package parser;
 
+import AST.Expr;
+import AST.Stmt;
 import lexicalAnalysis.Token;
 import lexicalAnalysis.Token.TokenType;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static lexicalAnalysis.Lexer.debuggingMode;
-
 public class Parser {
-    private List<Token> tokens;
+    private final List<Token> tokens;
     private int cursor = 0;
 
     public Parser(List<Token> tokens) {
@@ -43,309 +43,282 @@ public class Parser {
         return t != null && t.type == TokenType.KEYWORD && t.value.equals(kw);
     }
 
-    public void parse() {
+    public List<Stmt> parseProgram() {
+        List<Stmt> statements = new ArrayList<>();
         while (cursor < tokens.size()) {
-            parseStatement();
+            Stmt stmt = parseStatement();
+            if (stmt != null) statements.add(stmt);
+        }
+        return statements;
+    }
+
+    private Stmt parseStatement() {
+        Token t = peek();
+        if (t == null) return null;
+
+        if (t.type == TokenType.KEYWORD) {
+            switch (t.value) {
+                case "input" -> {
+                    return parseInputStmt();
+                }
+                case "const" -> {
+                    return parseConstStmt();
+                }
+                case "read" -> {
+                    return parseReadStmt();
+                }
+                case "print" -> {
+                    return parsePrint(false);
+                }
+                case "printn" -> {
+                    return parsePrint(true);
+                }
+                case "if" -> {
+                    return parseIfStmt();
+                }
+                case "while" -> {
+                    return parseWhileStmt();
+                }
+                case "return" -> {
+                    return parseReturnStmt();
+                }
+                default -> {
+                    System.err.println("Unknown keyword " + t.value + " at line " + t.line);
+                    consume();
+                    return null;
+                }
+            }
+        } else if (t.type == TokenType.IDENTIFIER) {
+            return parseAssignmentStmt();
+        } else {
+            System.err.println("Unexpected token " + t.value + " at line " + t.line);
+            consume();
+            return null;
         }
     }
 
-    private void parseInput() {
-        consume();
-        Token var = consume();
+    // ==================== Statements ====================
 
-        if (var == null || var.type != TokenType.IDENTIFIER) {
-            System.err.println("Error: Expected identifier after input at line " + var.line);
-            return;
-        }
-
-        if (matchSymbol("[")) {
-            consume();
-            if (!matchSymbol("]")) {
-                System.err.println("Error: Expected ] for array at line " + var.line);
-            }
-            consume();
-
-            if (matchOperator("=")) {
-                consume();
-                List<String> values = new ArrayList<>();
-
-                while (!matchSymbol(";")) {
-                    Token val = consume();
-                    if (val.type == TokenType.STRING || val.type == TokenType.NUMBER) {
-                        values.add(val.value);
-                    }
-                    if (matchSymbol(",")) consume();
-                }
-
-                if (debuggingMode) {
-                    System.out.println("Parsed Input Array: " + var.value + " = " + values);
-                }
-            }
-        } else if (matchOperator("=")) {
-            consume();
-            parseExpression();
-        }
-
-        expectSemicolon("input");
-        if (debuggingMode)
-            System.out.println("Parsed Input: " + var.value);
-    }
-
-    private void parseConst() {
-        consume();
+    private Stmt parseInputStmt() {
+        Token t = consume(); // input
         Token var = consume();
 
         if (var.type != TokenType.IDENTIFIER) {
-            System.err.println("Error: Expected identifier after const at line " + var.line);
-            return;
+            System.err.println("Expected identifier after input at line " + var.line);
+            return null;
+        }
+
+        Expr expr = null;
+        if (matchOperator("=")) {
+            consume();
+            expr = parseExpression();
+        }
+
+        expectSemicolon("input");
+        return new Stmt.Input(var.value, expr, var.line);
+    }
+
+    private Stmt parseConstStmt() {
+        Token t = consume(); // const
+        Token var = consume();
+
+        if (var.type != TokenType.IDENTIFIER) {
+            System.err.println("Expected identifier after const at line " + var.line);
+            return null;
         }
 
         if (!matchOperator("=")) {
-            System.err.println("Error: Expected = after const at line " + var.line);
-            return;
+            System.err.println("Expected '=' after const at line " + var.line);
+            return null;
         }
 
-        consume();
-        parseExpression();
+        consume(); // =
+        Expr expr = parseExpression();
         expectSemicolon("const");
 
-        if (debuggingMode)
-            System.out.println("Parsed Const: " + var.value);
+        return new Stmt.Const(var.value, expr, var.line);
     }
 
-    private void parseRead() {
-        consume();
+    private Stmt parseReadStmt() {
+        Token t = consume(); // read
         Token var = consume();
 
-        if (var.type != TokenType.IDENTIFIER)
-            System.err.println("Error: Expected identifier after read at line " + var.line);
+        if (var.type != TokenType.IDENTIFIER) {
+            System.err.println("Expected identifier after read at line " + var.line);
+            return null;
+        }
 
         expectSemicolon("read");
-
-        if (debuggingMode)
-            System.out.println("Parsed Read: " + var.value);
+        return new Stmt.Input(var.value, null, var.line);
     }
 
-    private void parseAssignment() {
-        Token var = consume();
+    private Stmt parsePrint(boolean newLine) {
+        Token t = consume(); // print / printn
+        Expr expr = parseExpression();
+        expectSemicolon("print");
+        return new Stmt.Print(expr, newLine, t.line);
+    }
 
-        if (matchOperator("++") || matchOperator("--")) {
+    private Stmt parseAssignmentStmt() {
+        Token var = consume(); // variable
+
+        if (matchOperator("=")) {
+            consume();
+            Expr expr = parseExpression();
+            expectSemicolon("assignment");
+            return new Stmt.Assignment(var.value, expr, var.line);
+        } else if (matchOperator("++") || matchOperator("--")) {
             Token op = consume();
             expectSemicolon("increment/decrement");
-
-            if (debuggingMode)
-                System.out.println("Parsed " + op.value + " for " + var.value);
-            return;
-        }
-
-        if (!matchOperator("=")) {
-            System.err.println("Error: Expected '=' in assignment at line " + var.line);
+            Expr expr = new Expr.Binary(new Expr.Variable(var.value, var.line), op.value.equals("++") ? "+" : "-", new Expr.Literal(1, var.line), var.line);
+            return new Stmt.Assignment(var.value, expr, var.line);
+        } else {
+            System.err.println("Expected assignment operator at line " + var.line);
             synchronize();
-            return;
-        }
-
-        consume();
-        parseExpression();
-        expectSemicolon("assignment");
-
-        if (debuggingMode)
-            System.out.println("Parsed Assignment: " + var.value);
-    }
-
-    private void synchronize() {
-        while (peek() != null) {
-            if (matchSymbol(";")) {
-                consume();
-                return;
-            }
-            consume();
+            return null;
         }
     }
 
-    private void parsePrint(boolean newLine) {
-        consume();
-        parseExpression();
-        expectSemicolon("print");
-
-        if (debuggingMode) {
-            System.out.println("Parsed Print" + (newLine ? "n" : ""));
-        }
-    }
-
-    private void parseIf() {
-        consume();
+    private Stmt parseIfStmt() {
+        Token t = consume(); // if
         expectSymbol("(", "if");
-        parseExpression();
+        Expr condition = parseExpression();
         expectSymbol(")", "if");
         expectSymbol("{", "if");
 
-        parseBlock();
+        List<Stmt> thenBranch = parseBlock();
 
-        while (matchKeyword("elif")) {
-            parseElif();
-        }
-
+        List<Stmt> elseBranch = null;
         if (matchKeyword("else")) {
-            parseElse();
+            consume();
+            expectSymbol("{", "else");
+            elseBranch = parseBlock();
         }
+
+        return new Stmt.If(condition, thenBranch, elseBranch, t.line);
     }
 
-    private void parseElif() {
-        consume();
-        expectSymbol("(", "elif");
-        parseExpression();
-        expectSymbol(")", "elif");
-        expectSymbol("{", "elif");
-        parseBlock();
-    }
-
-    private void parseElse() {
-        consume();
-        expectSymbol("{", "else");
-        parseBlock();
-    }
-
-    private void parseWhile() {
-        consume();
+    private Stmt parseWhileStmt() {
+        Token t = consume(); // while
         expectSymbol("(", "while");
-        parseExpression();
+        Expr condition = parseExpression();
         expectSymbol(")", "while");
         expectSymbol("{", "while");
 
-        parseBlock();
-        if (debuggingMode)
-            System.out.println("Parsed While Loop");
+        List<Stmt> body = parseBlock();
+        return new Stmt.While(condition, body, t.line);
     }
 
-    private void parseFunction() {
-        consume();
-        Token name = consume();
-
-        if (name.type != TokenType.IDENTIFIER) {
-            System.err.println("Error: Expected function name at line " + name.line);
-            return;
-        }
-
-        expectSymbol("(", "function");
-
-        List<String> args = new ArrayList<>();
-        while (!matchSymbol(")")) {
-            Token arg = consume();
-            if (arg.type == TokenType.IDENTIFIER) {
-                args.add(arg.value);
-            }
-            if (matchSymbol(",")) consume();
-        }
-
-        consume();
-        expectSymbol("{", "function");
-
-        parseBlock();
-        if (debuggingMode)
-            System.out.println("Parsed Function: " + name.value + " args=" + args);
-    }
-
-    private void parseReturn() {
-        consume();
-        parseExpression();
+    private Stmt parseReturnStmt() {
+        Token t = consume(); // return
+        Expr expr = parseExpression();
         expectSemicolon("return");
-        if (debuggingMode)
-            System.out.println("Parsed Return");
+        return new Stmt.Return(expr, t.line);
     }
 
-    private void parseBlock() {
+    private List<Stmt> parseBlock() {
+        List<Stmt> statements = new ArrayList<>();
         while (!matchSymbol("}") && peek() != null) {
-            parseStatement();
+            Stmt stmt = parseStatement();
+            if (stmt != null) statements.add(stmt);
         }
         expectSymbol("}", "block");
+        return statements;
     }
 
-    private void parseExpression() {
-        parseEquality();
+    // ==================== Expressions ====================
+
+    private Expr parseExpression() {
+        return parseEquality();
     }
 
-    private void parseEquality() {
-        parseComparison();
+    private Expr parseEquality() {
+        Expr expr = parseComparison();
         while (matchOperator("==") || matchOperator("!=")) {
-            consume();
-            parseComparison();
+            String op = consume().value;
+            Expr right = parseComparison();
+            expr = new Expr.Binary(expr, op, right, peek() != null ? peek().line : -1);
         }
+        return expr;
     }
 
-    private void parseComparison() {
-        parseTerm();
-        while (matchOperator(">") || matchOperator("<") ||
-                matchOperator(">=") || matchOperator("<=")) {
-            consume();
-            parseTerm();
+    private Expr parseComparison() {
+        Expr expr = parseTerm();
+        while (matchOperator(">") || matchOperator("<") || matchOperator(">=") || matchOperator("<=")) {
+            String op = consume().value;
+            Expr right = parseTerm();
+            expr = new Expr.Binary(expr, op, right, peek() != null ? peek().line : -1);
         }
+        return expr;
     }
 
-    private void parseTerm() {
-        parseFactor();
+    private Expr parseTerm() {
+        Expr expr = parseFactor();
         while (matchOperator("+") || matchOperator("-")) {
-            consume();
-            parseFactor();
+            String op = consume().value;
+            Expr right = parseFactor();
+            expr = new Expr.Binary(expr, op, right, peek() != null ? peek().line : -1);
         }
+        return expr;
     }
 
-    private void parseFactor() {
-        parseUnary();
+    private Expr parseFactor() {
+        Expr expr = parseUnary();
         while (matchOperator("*") || matchOperator("/") || matchOperator("%")) {
-            consume();
-            parseUnary();
+            String op = consume().value;
+            Expr right = parseUnary();
+            expr = new Expr.Binary(expr, op, right, peek() != null ? peek().line : -1);
         }
+        return expr;
     }
 
-    private void parseUnary() {
+    private Expr parseUnary() {
         if (matchOperator("-") || matchOperator("!")) {
-            consume();
-            parseUnary();
+            String op = consume().value;
+            Expr right = parseUnary();
+            return new Expr.Unary(op, right, peek() != null ? peek().line : -1);
         } else {
-            parsePrimary();
+            return parsePrimary();
         }
     }
 
-    private void parsePrimary() {
-        Token t = peek();
+    private Expr parsePrimary() {
+        Token t = consume();
+        if (t == null) throw new RuntimeException("Unexpected end of input");
 
-        if (t.type == TokenType.NUMBER ||
-                t.type == TokenType.STRING ||
-                (t.type == TokenType.KEYWORD && (t.value.equals("true") || t.value.equals("false")))) {
-            consume();
-            return;
-        }
+        if (t.type == TokenType.NUMBER) return new Expr.Literal(Double.parseDouble(t.value), t.line);
+        if (t.type == TokenType.STRING) return new Expr.Literal(t.value, t.line);
+        if (t.type == TokenType.KEYWORD && (t.value.equals("true") || t.value.equals("false")))
+            return new Expr.Literal(Boolean.parseBoolean(t.value), t.line);
 
         if (t.type == TokenType.IDENTIFIER) {
-            consume(); // consume function name or variable
-
             if (matchSymbol("(")) {
                 consume(); // (
-
+                List<Expr> args = new ArrayList<>();
                 if (!matchSymbol(")")) {
-                    parseExpression();
+                    args.add(parseExpression());
                     while (matchSymbol(",")) {
                         consume();
-                        parseExpression();
+                        args.add(parseExpression());
                     }
                 }
-
                 expectSymbol(")", "function call");
+                return new Expr.Call(null, args, t.line);
+            } else {
+                return new Expr.Variable(t.value, t.line);
             }
-
-            return;
         }
 
-        if (matchSymbol("(")) {
-            consume();
-            parseExpression();
+        if (t.value.equals("(")) {
+            Expr expr = parseExpression();
             expectSymbol(")", "expression");
-            return;
+            return expr;
         }
 
-        System.err.println("Error: Unexpected token in expression: " + t.value + " at line " + t.line);
-        consume();
+        throw new RuntimeException("Unexpected token in expression: " + t.value + " at line " + t.line);
     }
+
+    // ==================== Helpers ====================
 
     private void expectSemicolon(String where) {
         if (!matchSymbol(";")) {
@@ -363,31 +336,8 @@ public class Parser {
         } else consume();
     }
 
-    private void parseStatement() {
-        Token t = peek();
-        if (t == null) return;
-
-        if (t.type == TokenType.KEYWORD) {
-            switch (t.value) {
-                case "input" -> parseInput();
-                case "const" -> parseConst();
-                case "read" -> parseRead();
-                case "print" -> parsePrint(false);
-                case "printn" -> parsePrint(true);
-                case "if" -> parseIf();
-                case "while" -> parseWhile();
-                case "function" -> parseFunction();
-                case "return" -> parseReturn();
-                default -> {
-                    System.err.println("Error: Unknown keyword " + t.value + " at line " + t.line);
-                    consume();
-                }
-            }
-        } else if (t.type == TokenType.IDENTIFIER) {
-            parseAssignment();
-        } else {
-            System.err.println("Error: Unexpected token " + t.value + " at line " + t.line);
-            consume();
-        }
+    private void synchronize() {
+        while (peek() != null && !matchSymbol(";")) consume();
+        if (matchSymbol(";")) consume();
     }
 }

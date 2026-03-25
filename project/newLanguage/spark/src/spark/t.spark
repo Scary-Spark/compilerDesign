@@ -1,0 +1,17 @@
+input a;
+a=10;
+
+input b=15.12;
+
+const c = 45; // constant variable
+
+/*
+    a multi line comment
+*/
+
+input e;
+read e; // taking user input, variable should be declared first
+
+// print statements (don't give auto newline at the end)
+print a; //output: 10
+print "a is: " + a; // output: a is: 10

@@ -1,5 +1,6 @@
 package executor;
 
+import AST.Stmt;
 import lexicalAnalysis.Lexer;
 import lexicalAnalysis.Token;
 import parser.Parser;
@@ -7,7 +8,9 @@ import parser.Parser;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static lexicalAnalysis.Lexer.debuggingMode;
 
@@ -74,6 +77,11 @@ public class Executor {
         }
 
         Parser parser = new Parser(allTokens);
-        parser.parse();
+        List<Stmt> program = parser.parseProgram(); // new method that collects statements
+        Map<String, Object> context = new HashMap<>();
+
+        for (Stmt stmt : program) {
+            stmt.execute(context);
+        }
     }
 }

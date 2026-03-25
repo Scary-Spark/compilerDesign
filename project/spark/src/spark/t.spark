@@ -1,11 +1,53 @@
-function a(x,y) {
- print "something";
- read m;
- return x+y;
+input a;
+a = 10; // int should be long long int
+const b = 15;
+input name="Spark";
+
+input isStuent = true;
+input double = 3.252623;
+
+read x; // taking input
+
+// comment
+/*
+    multi line comment
+*/
+
+// arithmetic operation
+input sum = a + b;
+input sub = a - b;
+input div = a / b;
+input mul = a * b;
+input modulo = a % b;
+
+input studentsName[] = "rahim", "karim", "rafiq";
+
+if (a==0) {
+    printn a + "is zero";
+    // printn will be a new line automatically
+}
+elif (a>0) {
+    print a + " is positive\n";
+}
+else {
+    print a + " is negative\n";
 }
 
-function add( x, y){
-    return a(x,y);
+function hello(){
+    printn "A function without any argument and return type";
 }
 
-input k=add(2,3);
+function helloWorld(x,y){
+    printn "A function with argument";
+}
+
+function add(x,y){
+    return x+y;
+}
+
+input i = 0;
+while(i==4) {
+    printn "Hi";
+    i++;
+    // also decrement should exists
+}

@@ -1,5 +1,0 @@
-input a=1;
-input b=2;
-
-input c =a+b;
-print c;

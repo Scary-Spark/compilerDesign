@@ -7,21 +7,23 @@
 input a = 10;           // keyword + identifier + operator + number + symbol
 input b = 15.5;         // floating point number
 const c = a + b;        // const keyword, operator +
+input d;
+input name="Spark";
 
 d = c - 5;              // identifier assignment, operator -
 
-e = d * 2;              // operator *
-f = e / 3;              // operator /
-g = f % 2;              // operator %
+a = d * 2;              // operator *
+d = a / 3;              // operator /
+b = f % 2;              // operator %
 
-h++;                     // operator ++
-i--;                     // operator --
+a++;                     // operator ++
+b--;                     // operator --
 
-j += 5;                  // operator +=
-k -= 3;                  // operator -=
-l *= 2;                  // operator *=
-m /= 4;                  // operator /=
-n %= 3;                  // operator %=
+a += 5;                  // operator +=
+a -= 3;                  // operator -=
+b *= 2;                  // operator *=
+d /= 4;                  // operator /=
+d %= 3;                  // operator %=
 
 print "Values: ${a}, ${b}, ${c}";  // string, print keyword
 
